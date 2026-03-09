@@ -1,0 +1,56 @@
+{
+  "soldiers": [
+    {
+      "id": 2,
+      "militaryId": "M-1002",
+      "fullName": "سالم فهد الدوسري",
+      "birthDate": "1998-11-20",
+      "birthPlace": "الدمام",
+      "nationalId": "1020304051",
+      "rank": "عريف",
+      "specialization": "سائق",
+      "unit": "السرية الثانية",
+      "battalion": "الكتيبة 55",
+      "joinDate": "2020-07-15",
+      "adminStatus": "على رأس العمل",
+      "healthStatus": "غير لائق",
+      "maritalStatus": "أعزب",
+      "phoneNumber": "0500000002",
+      "address": "حي الشاطئ، الدمام",
+      "closestRelative": "فهد الدوسري (أب)",
+      "photoPath": null,
+      "lastPromotionDate": null,
+      "nextPromotionDate": null,
+      "archived": false,
+      "createdAt": "2026-03-08T02:01:00.120Z"
+    }
+  ],
+  "attendance": [
+    {
+      "id": 1,
+      "soldierId": 1,
+      "date": "2026-03-08",
+      "status": "حاضر",
+      "createdAt": "2026-03-08T02:01:00.125Z"
+    },
+    {
+      "id": 2,
+      "soldierId": 2,
+      "date": "2026-03-08",
+      "status": "مهمة",
+      "createdAt": "2026-03-08T02:01:00.130Z"
+    }
+  ],
+  "violations": [
+    {
+      "id": 1,
+      "soldierId": 1,
+      "date": "2026-03-08",
+      "reason": "التأخر",
+      "punishment": "إنذار",
+      "notes": "",
+      "createdAt": "2026-03-08T02:10:48.491Z"
+    }
+  ],
+  "excuses": []
+}

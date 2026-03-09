@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Local Font Definitions for Offline Use */
+@font-face {
+  font-family: 'Cairo';
+  src: url('./assets/fonts/Cairo-Regular.ttf') format('truetype');
+  font-weight: 400 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Tajawal';
+  src: url('./assets/fonts/Tajawal-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Tajawal';
+  src: url('./assets/fonts/Tajawal-Bold.ttf') format('truetype');
+  font-weight: 700 800;
+  font-style: normal;
+}
+
+@layer base {
+  :root {
+    --font-sans: 'Cairo', sans-serif;
+    --font-display: 'Tajawal', sans-serif;
+
+    /* Professional Military Aesthetic - Light Mode */
+    --background: 60 5% 96%;
+    --foreground: 150 20% 15%;
+    
+    --primary: 153 35% 25%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 215 15% 35%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 150 20% 15%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 20% 15%;
+    
+    --muted: 150 10% 90%;
+    --muted-foreground: 150 10% 45%;
+    
+    --accent: 40 40% 45%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 15% 85%;
+    --input: 150 15% 85%;
+    --ring: 153 35% 25%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar Variables */
+    --sidebar-background: 153 35% 20%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 153 35% 30%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 153 35% 28%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 153 35% 25%;
+    --sidebar-ring: 153 35% 40%;
+  }
+
+  .dark {
+    --background: 150 15% 10%;
+    --foreground: 60 5% 90%;
+    
+    --primary: 153 30% 45%;
+    --primary-foreground: 150 20% 10%;
+    
+    --secondary: 215 15% 45%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --card: 150 15% 14%;
+    --card-foreground: 60 5% 90%;
+    
+    --popover: 150 15% 14%;
+    --popover-foreground: 60 5% 90%;
+    
+    --muted: 150 15% 20%;
+    --muted-foreground: 150 10% 65%;
+    
+    --accent: 40 40% 50%;
+    --accent-foreground: 150 20% 10%;
+    
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 15% 22%;
+    --input: 150 15% 22%;
+    --ring: 153 30% 45%;
+
+    /* Sidebar Variables */
+    --sidebar-background: 150 20% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 153 30% 45%;
+    --sidebar-primary-foreground: 150 20% 10%;
+    --sidebar-accent: 150 15% 16%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 150 15% 14%;
+    --sidebar-ring: 153 30% 45%;
+  }
+}
+
+@layer base {
+  html {
+    direction: rtl;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .hover-elevate {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10;
+  }
+  
+  .glass-panel {
+    @apply bg-background/80 backdrop-blur-md border border-border/50 shadow-sm;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-muted/50 rounded-full;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/30 rounded-full hover:bg-primary/50 transition-colors;
+}
