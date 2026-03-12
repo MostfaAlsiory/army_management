@@ -7,7 +7,8 @@ import {
   type Excuse, type InsertExcuse, type UpdateExcuseRequest,
   type Notification, type InsertNotification,
   type ActivityLog, type InsertActivityLog, activityLogs,
-  type ReportTemplate, type InsertReportTemplate
+  type ReportTemplate, type InsertReportTemplate,
+  type CustomField, type InsertCustomField, customFields
 } from "@shared/schema";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 
@@ -51,6 +52,12 @@ export interface IStorage {
   createReportTemplate(template: InsertReportTemplate): Promise<ReportTemplate>;
   updateReportTemplate(id: number, updates: Partial<InsertReportTemplate>): Promise<ReportTemplate>;
   deleteReportTemplate(id: number): Promise<void>;
+
+  // Custom Fields
+  getCustomFields(entityType?: string): Promise<CustomField[]>;
+  createCustomField(field: InsertCustomField): Promise<CustomField>;
+  updateCustomField(id: number, updates: Partial<InsertCustomField>): Promise<CustomField>;
+  deleteCustomField(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -410,6 +417,47 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
+    }
+  }
+
+  async getCustomFields(entityType?: string): Promise<CustomField[]> {
+    try {
+      if (entityType) {
+        return await db.select().from(customFields).where(eq(customFields.entityType, entityType)).orderBy(customFields.createdAt);
+      }
+      return await db.select().from(customFields).orderBy(customFields.createdAt);
+    } catch (err) {
+      console.error("Error fetching custom fields:", err);
+      throw err;
+    }
+  }
+
+  async createCustomField(field: InsertCustomField): Promise<CustomField> {
+    try {
+      const [newField] = await db.insert(customFields).values(field).returning();
+      return newField;
+    } catch (err) {
+      console.error("Error creating custom field:", err);
+      throw err;
+    }
+  }
+
+  async updateCustomField(id: number, updates: Partial<InsertCustomField>): Promise<CustomField> {
+    try {
+      const [updated] = await db.update(customFields).set(updates).where(eq(customFields.id, id)).returning();
+      return updated;
+    } catch (err) {
+      console.error("Error updating custom field:", err);
+      throw err;
+    }
+  }
+
+  async deleteCustomField(id: number): Promise<void> {
+    try {
+      await db.delete(customFields).where(eq(customFields.id, id));
+    } catch (err) {
+      console.error("Error deleting custom field:", err);
+      throw err;
     }
   }
 }

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useSoldiers, useUpdateSoldier } from "@/hooks/use-soldiers";
+import { useCustomFields } from "@/hooks/use-custom-fields";
 import { SoldierForm } from "@/components/SoldierForm";
 import { 
   Card, 
@@ -47,7 +48,13 @@ type SortConfig = {
   direction: 'asc' | 'desc' | null;
 };
 
-export default function Personnel() {
+const fieldValueToString = (val: any, type: string) => {
+    if (val === undefined || val === null) return "-";
+    if (type === "boolean") return val ? "نعم" : "لا";
+    return String(val);
+  };
+
+  export default function Personnel() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -60,6 +67,7 @@ export default function Personnel() {
   });
 
   const updateSoldier = useUpdateSoldier();
+  const { data: customFields } = useCustomFields("soldiers");
 
   const handleSort = (key: keyof Soldier) => {
     let direction: 'asc' | 'desc' | null = 'asc';
@@ -95,17 +103,24 @@ export default function Personnel() {
   const exportToExcel = () => {
     if (!sortedSoldiers.length) return;
 
-    const exportData = sortedSoldiers.map(soldier => ({
-      "الرقم العسكري": soldier.militaryId,
-      "الاسم الكامل": soldier.fullName,
-      "الرتبة": soldier.rank,
-      "التخصص": soldier.specialization,
-      "الوحدة": soldier.unit,
-      "الكتيبة": soldier.battalion,
-      "رقم الهاتف": soldier.phoneNumber,
-      "الحالة الإدارية": soldier.adminStatus,
-      "مؤرشف": soldier.archived ? "نعم" : "لا"
-    }));
+    const exportData = sortedSoldiers.map(soldier => {
+      const row: any = {
+        "الرقم العسكري": soldier.militaryId,
+        "الاسم الكامل": soldier.fullName,
+        "الرتبة": soldier.rank,
+        "التخصص": soldier.specialization,
+        "الوحدة": soldier.unit,
+        "الكتيبة": soldier.battalion,
+        "رقم الهاتف": soldier.phoneNumber,
+        "الحالة الإدارية": soldier.adminStatus,
+        "مؤرشف": soldier.archived ? "نعم" : "لا"
+      };
+      // إضافة الحقول المخصصة للتصدير
+      customFields?.forEach(cf => {
+        row[cf.label] = fieldValueToString((soldier.dynamicFields as any)?.[cf.name], cf.type);
+      });
+      return row;
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -245,6 +260,11 @@ export default function Personnel() {
                         {getSortIcon('adminStatus')}
                       </div>
                     </TableHead>
+                    {customFields?.map(cf => (
+                      <TableHead key={cf.id} className="font-bold text-center text-purple-700 bg-purple-50/60">
+                        {cf.label}
+                      </TableHead>
+                    ))}
                     <TableHead className="font-bold text-center text-foreground">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -279,6 +299,11 @@ export default function Personnel() {
                           {soldier.adminStatus}
                         </Badge>
                       </TableCell>
+                      {customFields?.map(cf => (
+                        <TableCell key={cf.id} className="text-center text-sm">
+                          {fieldValueToString((soldier.dynamicFields as any)?.[cf.name], cf.type)}
+                        </TableCell>
+                      ))}
                       <TableCell>
                         <div className="flex items-center justify-center gap-2">
                           <Button 

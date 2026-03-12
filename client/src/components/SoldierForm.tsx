@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertSoldierSchema, type InsertSoldier, type Soldier } from "@shared/schema";
 import { useCreateSoldier, useUpdateSoldier } from "@/hooks/use-soldiers";
+import { useCustomFields } from "@/hooks/use-custom-fields";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -14,6 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -48,6 +50,7 @@ export function SoldierForm({ soldier, onSuccess }: SoldierFormProps) {
 
   const createMutation = useCreateSoldier();
   const updateMutation = useUpdateSoldier();
+  const { data: customFields } = useCustomFields("soldiers");
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -69,6 +72,7 @@ export function SoldierForm({ soldier, onSuccess }: SoldierFormProps) {
     address: soldier.address,
     closestRelative: soldier.closestRelative,
     photoPath: soldier.photoPath,
+    dynamicFields: soldier.dynamicFields || {},
   } : {
     militaryId: "",
     fullName: "",
@@ -87,6 +91,7 @@ export function SoldierForm({ soldier, onSuccess }: SoldierFormProps) {
     address: "",
     closestRelative: "",
     photoPath: null,
+    dynamicFields: {},
   };
 
   const form = useForm<InsertSoldier>({
@@ -340,6 +345,48 @@ export function SoldierForm({ soldier, onSuccess }: SoldierFormProps) {
             )} />
           </div>
         </div>
+        
+          {customFields && customFields.length > 0 && (
+            <div className="col-span-1 md:col-span-2 space-y-4">
+              <h3 className="font-display font-bold text-lg border-b pb-2 text-primary">حقول إضافية</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customFields.map((field) => (
+                  <FormField 
+                    key={field.id}
+                    control={form.control} 
+                    name={`dynamicFields.${field.name}` as any}
+                    render={({ field: formField }) => (
+                      <FormItem>
+                        <FormLabel>{field.label} {field.isRequired && <span className="text-red-500">*</span>}</FormLabel>
+                        {field.type === "text" && <FormControl><Input {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                        {field.type === "number" && <FormControl><Input type="number" {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                        {field.type === "date" && <FormControl><Input type="date" {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                        {field.type === "select" && (
+                          <Select onValueChange={formField.onChange} defaultValue={formField.value || field.defaultValue}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              {Array.isArray(field.options) && field.options.map((opt: string) => (
+                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {field.type === "boolean" && (
+                          <FormControl>
+                            <div className="flex items-center space-x-2">
+                              <Switch checked={!!formField.value} onCheckedChange={formField.onChange} />
+                            </div>
+                          </FormControl>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )} 
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+    
         <div className="flex justify-end pt-4 border-t gap-3">
           <Button type="submit" disabled={isPending || uploading} className="min-w-32 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all">
             {isPending && <Loader2 className="me-2 h-4 w-4 animate-spin" />}

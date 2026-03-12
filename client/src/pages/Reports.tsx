@@ -5,6 +5,7 @@ import { useSoldiers } from "@/hooks/use-soldiers";
 import { useViolations } from "@/hooks/use-violations";
 import { useExcuses } from "@/hooks/use-excuses";
 import { useReportTemplates } from "@/hooks/use-report-templates";
+import { useCustomFields } from "@/hooks/use-custom-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -22,14 +23,24 @@ type SortConfig = {
   direction: 'asc' | 'desc' | null;
 };
 
-type ReportType = 'attendance' | 'excuses' | 'violations' | 'comprehensive';
+type ReportType = 'attendance' | 'excuses' | 'violations' | 'comprehensive' | 'individual_data' | 'unit_personnel' | 'human_power' | 'personnel_distribution' | 'promotion_eligible' | 'daily_movement' | 'presence_status' | 'general_statistics' | 'monthly_leadership_report' | 'quarterly_readiness_report';
 
 const REPORT_TYPES = [
-  { value: 'attendance', label: 'تقرير الحضور والغياب' },
-  { value: 'excuses', label: 'تقرير الإجازات والأعذار' },
-  { value: 'violations', label: 'تقرير المخالفات والجزاءات' },
-  { value: 'comprehensive', label: 'التقرير الشامل (عام)' },
-];
+    { value: 'individual_data', label: 'تقرير بيانات الفرد' },
+    { value: 'unit_personnel', label: 'كشف أفراد الوحدة' },
+    { value: 'human_power', label: 'تقرير القوة البشرية' },
+    { value: 'attendance', label: 'تقرير الحضور والغياب' },
+    { value: 'excuses', label: 'تقرير الإجازات' },
+    { value: 'personnel_distribution', label: 'تقرير توزيع الأفراد' },
+    { value: 'promotion_eligible', label: 'تقرير المستحقين للترقية' },
+    { value: 'daily_movement', label: 'تقرير الحركة اليومية' },
+    { value: 'presence_status', label: 'تقرير حالات التواجد' },
+    { value: 'general_statistics', label: 'تقرير الإحصائيات العامة' },
+    { value: 'violations', label: 'تقرير المخالفات والجزاءات' },
+    { value: 'monthly_leadership_report', label: 'التقرير الشهري المرفوع للقيادة' },
+    { value: 'quarterly_readiness_report', label: 'تقرير الجاهزية الربع سنوي' },
+    { value: 'comprehensive', label: 'التقرير الشامل (عام)' },
+  ];
 
 const EXCUSE_TYPE_OPTIONS = [
   { value: 'all', label: 'جميع الأنواع' },
@@ -63,6 +74,9 @@ export default function Reports() {
   const [excuseTypeFilter, setExcuseTypeFilter] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
   const [searchTerm, setSearchTerm] = useState<string>("");
+    const [unitFilter, setUnitFilter] = useState<string>("all");
+    const [battalionFilter, setBattalionFilter] = useState<string>("all");
+    const [rankFilter, setRankFilter] = useState<string>("all");
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   
   // Column customization for attendance
@@ -80,6 +94,55 @@ export default function Reports() {
   const { data: violations, isLoading: loadingViolations } = useViolations();
   const { data: excuses, isLoading: loadingExcuses } = useExcuses();
   const { data: templates, isLoading: loadingTemplates } = useReportTemplates();
+  const { data: soldierCustomFields } = useCustomFields("soldiers");
+  const { data: violationCustomFields } = useCustomFields("violations");
+  const { data: excuseCustomFields } = useCustomFields("excuses");
+  const { data: attendanceCustomFields } = useCustomFields("attendance");
+
+  // Determine which custom fields apply to the current report type
+  const activeCustomFields = useMemo(() => {
+    switch (reportType) {
+      case 'violations': return violationCustomFields || [];
+      case 'excuses': return excuseCustomFields || [];
+      case 'attendance': return attendanceCustomFields || [];
+      default: return soldierCustomFields || [];
+    }
+  }, [reportType, soldierCustomFields, violationCustomFields, excuseCustomFields, attendanceCustomFields]);
+
+  const fieldValueToString = (val: any, type: string) => {
+    if (val === undefined || val === null) return "-";
+    if (type === "boolean") return val ? "نعم" : "لا";
+    return String(val);
+  };
+
+    const uniqueUnits = useMemo(() => {
+      if (!soldiers) return [];
+      return Array.from(new Set(soldiers.map(s => s.unit).filter(Boolean)));
+    }, [soldiers]);
+
+    const uniqueBattalions = useMemo(() => {
+      if (!soldiers) return [];
+      return Array.from(new Set(soldiers.map(s => s.battalion).filter(Boolean)));
+    }, [soldiers]);
+
+    const uniqueRanks = useMemo(() => {
+      if (!soldiers) return [];
+      return Array.from(new Set(soldiers.map(s => s.rank).filter(Boolean)));
+    }, [soldiers]);
+
+    // General Filter Function
+    const applyGeneralFilters = (soldier: any) => {
+      if (!soldier) return false;
+      if (unitFilter !== 'all' && soldier.unit !== unitFilter) return false;
+      if (battalionFilter !== 'all' && soldier.battalion !== battalionFilter) return false;
+      if (rankFilter !== 'all' && soldier.rank !== rankFilter) return false;
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        if (!soldier.fullName?.toLowerCase().includes(search) && !soldier.militaryId?.toLowerCase().includes(search)) return false;
+      }
+      return true;
+    };
+  
 
   const attendanceFields = [
     { id: "militaryId", label: "الرقم العسكري" },
@@ -117,235 +180,372 @@ export default function Reports() {
 
   // Attendance Report Data
   const attendanceReportData = useMemo(() => {
-    if (!attendanceData || !soldiers) return [];
-    
-    return attendanceData
-      .map(record => {
-        const soldier = soldiers.find(s => s.id === record.soldierId);
-        return {
-          ...record,
-          militaryId: soldier?.militaryId || "",
-          fullName: soldier?.fullName || "",
-          rank: soldier?.rank || "",
-          unit: soldier?.unit || "",
-          battalion: soldier?.battalion || "",
-          phoneNumber: soldier?.phoneNumber || "",
-          specialization: soldier?.specialization || "",
-        };
-      })
-      .filter(r => {
-        if (!searchTerm) return true;
-        const search = searchTerm.toLowerCase();
-        return r.fullName.toLowerCase().includes(search) || r.militaryId.toLowerCase().includes(search);
-      })
-      .sort((a, b) => {
-        if (!sortConfig.key || !sortConfig.direction) return 0;
-        const aVal = (a as any)[sortConfig.key!] ?? "";
-        const bVal = (b as any)[sortConfig.key!] ?? "";
-        return sortConfig.direction === 'asc' 
-          ? String(aVal).localeCompare(String(bVal))
-          : String(bVal).localeCompare(String(aVal));
-      });
-  }, [attendanceData, soldiers, sortConfig, searchTerm]);
+      if (!attendanceData || !soldiers) return [];
+      return attendanceData
+        .map(record => {
+          const soldier = soldiers.find(s => s.id === record.soldierId);
+          const soldierAttendance = attendanceData.filter(a => a.soldierId === soldier?.id) || [];
+          const soldierExcuses = excuses?.filter(e => e.soldierId === soldier?.id) || [];
+          const soldierViolations = violations?.filter(v => v.soldierId === soldier?.id) || [];
+          
+          return {
+            ...record,
+            ...soldier,
+            dynamicFields: record.dynamicFields || {},
+            soldierDynamicFields: soldier?.dynamicFields || {},
+            militaryId: soldier?.militaryId || "",
+            fullName: soldier?.fullName || "",
+            rank: soldier?.rank || "",
+            unit: soldier?.unit || "",
+            battalion: soldier?.battalion || "",
+            phoneNumber: soldier?.phoneNumber || "",
+            specialization: soldier?.specialization || "",
+            // Attendance aggregates
+            attendanceCount: soldierAttendance.length,
+            presentCount: soldierAttendance.filter(a => a.status === 'حاضر').length,
+            absentCount: soldierAttendance.filter(a => a.status === 'غائب').length,
+            // Excuses aggregates
+            excusesCount: soldierExcuses.length,
+            leaveCount: soldierExcuses.filter(e => e.type === 'إجازة').length,
+            sickCount: soldierExcuses.filter(e => e.type === 'مرض').length,
+            imprisonmentCount: soldierExcuses.filter(e => e.type === 'سجن').length,
+            // Violations aggregates
+            violationsCount: soldierViolations.length,
+            _soldier: soldier,
+            _attendance: soldierAttendance,
+            _excuses: soldierExcuses,
+            _violations: soldierViolations
+          };
+        })
+        .filter(r => applyGeneralFilters(r._soldier))
+        .sort((a, b) => {
+          if (!sortConfig.key || !sortConfig.direction) return 0;
+          const aVal = (a as any)[sortConfig.key!] ?? "";
+          const bVal = (b as any)[sortConfig.key!] ?? "";
+          return sortConfig.direction === 'asc' 
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+        });
+    }, [attendanceData, soldiers, sortConfig, searchTerm, unitFilter, battalionFilter, rankFilter, excuses, violations]);
 
-  // Excuses Report Data
+  // Excuses Report Data - Enriched with soldier and related data
   const excusesReportData = useMemo(() => {
-    if (!excuses || !soldiers) return [];
-    
-    const filtered = excuses
-      .filter(e => {
-        // Filter by date range
-        if (e.startDate > toDate || e.endDate < fromDate) return false;
-        // Filter by excuse type
-        if (excuseTypeFilter !== 'all' && e.type !== excuseTypeFilter) return false;
-        return true;
-      })
-      .map(excuse => {
-        const soldier = soldiers.find(s => s.id === excuse.soldierId);
-        return {
-          ...excuse,
-          militaryId: soldier?.militaryId || "",
-          fullName: soldier?.fullName || "",
-          rank: soldier?.rank || "",
-          unit: soldier?.unit || "",
-          battalion: soldier?.battalion || "",
-        };
-      })
-      .filter(r => {
-        if (!searchTerm) return true;
-        const search = searchTerm.toLowerCase();
-        return r.fullName.toLowerCase().includes(search) || r.militaryId.toLowerCase().includes(search);
-      });
+      if (!excuses || !soldiers) return [];
+      const filtered = excuses
+        .filter(e => {
+          if (e.startDate > toDate || e.endDate < fromDate) return false;
+          if (excuseTypeFilter !== 'all' && e.type !== excuseTypeFilter) return false;
+          return true;
+        })
+        .map(excuse => {
+          const soldier = soldiers.find(s => s.id === excuse.soldierId);
+          const soldierAttendance = attendanceData?.filter(a => a.soldierId === soldier?.id) || [];
+          const soldierExcuses = excuses.filter(e => e.soldierId === soldier?.id);
+          const soldierViolations = violations?.filter(v => v.soldierId === soldier?.id) || [];
+          
+          return {
+            ...excuse,
+            ...soldier,
+            dynamicFields: excuse.dynamicFields || {},
+            soldierDynamicFields: soldier?.dynamicFields || {},
+            militaryId: soldier?.militaryId || "",
+            fullName: soldier?.fullName || "",
+            rank: soldier?.rank || "",
+            unit: soldier?.unit || "",
+            battalion: soldier?.battalion || "",
+            // Attendance data
+            attendanceCount: soldierAttendance.length,
+            presentCount: soldierAttendance.filter(a => a.status === 'حاضر').length,
+            absentCount: soldierAttendance.filter(a => a.status === 'غائب').length,
+            // Excuses data
+            excusesCount: soldierExcuses.length,
+            leaveCount: soldierExcuses.filter(e => e.type === 'إجازة').length,
+            sickCount: soldierExcuses.filter(e => e.type === 'مرض').length,
+            imprisonmentCount: soldierExcuses.filter(e => e.type === 'سجن').length,
+            // Violations data
+            violationsCount: soldierViolations.length,
+            _soldier: soldier,
+            _attendance: soldierAttendance,
+            _excuses: soldierExcuses,
+            _violations: soldierViolations
+          };
+        })
+        .filter(r => applyGeneralFilters(r._soldier));
 
-    // Sort
-    if (sortConfig.key && sortConfig.direction) {
-      filtered.sort((a, b) => {
-        const aVal = (a as any)[sortConfig.key!] ?? "";
-        const bVal = (b as any)[sortConfig.key!] ?? "";
-        return sortConfig.direction === 'asc' 
-          ? String(aVal).localeCompare(String(bVal))
-          : String(bVal).localeCompare(String(aVal));
-      });
-    }
+      if (sortConfig.key && sortConfig.direction) {
+        filtered.sort((a, b) => {
+          const aVal = (a as any)[sortConfig.key!] ?? "";
+          const bVal = (b as any)[sortConfig.key!] ?? "";
+          return sortConfig.direction === 'asc' 
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+        });
+      }
+      return filtered;
+    }, [excuses, soldiers, fromDate, toDate, excuseTypeFilter, sortConfig, searchTerm, unitFilter, battalionFilter, rankFilter, attendanceData, violations]);
 
-    return filtered;
-  }, [excuses, soldiers, fromDate, toDate, excuseTypeFilter, sortConfig, searchTerm]);
-
-  // Violations Report Data
+  // Violations Report Data - Enriched with soldier and related data
   const violationsReportData = useMemo(() => {
-    if (!violations || !soldiers) return [];
-    
-    const filtered = violations
-      .filter(v => v.date >= fromDate && v.date <= toDate)
-      .map(violation => {
-        const soldier = soldiers.find(s => s.id === violation.soldierId);
-        return {
-          ...violation,
-          militaryId: soldier?.militaryId || "",
-          fullName: soldier?.fullName || "",
-          rank: soldier?.rank || "",
-          unit: soldier?.unit || "",
-          battalion: soldier?.battalion || "",
-        };
-      })
-      .filter(r => {
-        if (!searchTerm) return true;
-        const search = searchTerm.toLowerCase();
-        return r.fullName.toLowerCase().includes(search) || r.militaryId.toLowerCase().includes(search);
-      });
+      if (!violations || !soldiers) return [];
+      const filtered = violations
+        .filter(v => v.date >= fromDate && v.date <= toDate)
+        .map(violation => {
+          const soldier = soldiers.find(s => s.id === violation.soldierId);
+          const soldierAttendance = attendanceData?.filter(a => a.soldierId === soldier?.id) || [];
+          const soldierExcuses = excuses?.filter(e => e.soldierId === soldier?.id) || [];
+          const soldierViolations = violations.filter(v => v.soldierId === soldier?.id);
+          
+          return {
+            ...violation,
+            ...soldier,
+            dynamicFields: violation.dynamicFields || {},
+            soldierDynamicFields: soldier?.dynamicFields || {},
+            militaryId: soldier?.militaryId || "",
+            fullName: soldier?.fullName || "",
+            rank: soldier?.rank || "",
+            unit: soldier?.unit || "",
+            battalion: soldier?.battalion || "",
+            // Attendance data
+            attendanceCount: soldierAttendance.length,
+            presentCount: soldierAttendance.filter(a => a.status === 'حاضر').length,
+            absentCount: soldierAttendance.filter(a => a.status === 'غائب').length,
+            // Excuses data
+            excusesCount: soldierExcuses.length,
+            leaveCount: soldierExcuses.filter(e => e.type === 'إجازة').length,
+            sickCount: soldierExcuses.filter(e => e.type === 'مرض').length,
+            imprisonmentCount: soldierExcuses.filter(e => e.type === 'سجن').length,
+            // Violations data
+            violationsCount: soldierViolations.length,
+            _soldier: soldier,
+            _attendance: soldierAttendance,
+            _excuses: soldierExcuses,
+            _violations: soldierViolations
+          };
+        })
+        .filter(r => applyGeneralFilters(r._soldier));
 
-    // Sort
-    if (sortConfig.key && sortConfig.direction) {
-      filtered.sort((a, b) => {
-        const aVal = (a as any)[sortConfig.key!] ?? "";
-        const bVal = (b as any)[sortConfig.key!] ?? "";
-        return sortConfig.direction === 'asc' 
-          ? String(aVal).localeCompare(String(bVal))
-          : String(bVal).localeCompare(String(aVal));
-      });
-    }
+      if (sortConfig.key && sortConfig.direction) {
+        filtered.sort((a, b) => {
+          const aVal = (a as any)[sortConfig.key!] ?? "";
+          const bVal = (b as any)[sortConfig.key!] ?? "";
+          return sortConfig.direction === 'asc' 
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+        });
+      }
+      return filtered;
+    }, [violations, soldiers, fromDate, toDate, sortConfig, searchTerm, unitFilter, battalionFilter, rankFilter, attendanceData, excuses]);
 
-    return filtered;
-  }, [violations, soldiers, fromDate, toDate, sortConfig, searchTerm]);
-
-  // Comprehensive Report Data (Soldier Summary)
+  // Comprehensive Report Data (Soldier Summary) - Fully enriched with all related data
   const comprehensiveReportData = useMemo(() => {
-    if (!soldiers || !attendanceData || !excuses || !violations) return [];
+      if (!soldiers || !attendanceData || !excuses || !violations) return [];
+      const now = new Date();
+      const today = format(now, 'yyyy-MM-dd');
 
-    const now = new Date();
-    const today = format(now, 'yyyy-MM-dd');
+      return soldiers
+        .filter(s => !s.archived && applyGeneralFilters(s))
+        .map(soldier => {
+          const soldierAttendance = attendanceData.filter(a => a.soldierId === soldier.id);
+          const soldierAttendanceFiltered = attendanceData.filter(a => a.soldierId === soldier.id && a.date >= fromDate && a.date <= toDate);
+          const presentCount = soldierAttendanceFiltered.filter(a => a.status === 'حاضر').length;
+          const absentCount = soldierAttendanceFiltered.filter(a => a.status === 'غائب').length;
+          const onLeaveCount = soldierAttendanceFiltered.filter(a => a.status === 'إجازة').length;
+          const onTaskCount = soldierAttendanceFiltered.filter(a => a.status === 'مهمة').length;
+          const sickCount = soldierAttendanceFiltered.filter(a => a.status === 'مريض').length;
+          const imprisonedCount = soldierAttendanceFiltered.filter(a => a.status === 'سجن').length;
 
-    return soldiers
-      .filter(s => !s.archived)
-      .map(soldier => {
-        // Count attendance
-        const soldierAttendance = attendanceData.filter(a => a.soldierId === soldier.id && a.date >= fromDate && a.date <= toDate);
-        const presentCount = soldierAttendance.filter(a => a.status === 'حاضر').length;
-        const absentCount = soldierAttendance.filter(a => a.status === 'غائب').length;
-        const onLeaveCount = soldierAttendance.filter(a => a.status === 'إجازة').length;
-        const onTaskCount = soldierAttendance.filter(a => a.status === 'مهمة').length;
-        const sickCount = soldierAttendance.filter(a => a.status === 'مريض').length;
-        const imprisonedCount = soldierAttendance.filter(a => a.status === 'سجن').length;
+          const soldierExcuses = excuses.filter(e => e.soldierId === soldier.id && e.startDate <= toDate && e.endDate >= fromDate);
+          const soldierExcusesAll = excuses.filter(e => e.soldierId === soldier.id);
+          const soldierLeaves = soldierExcuses.filter(e => e.type === 'إجازة');
+          const soldierSickness = soldierExcuses.filter(e => e.type === 'مرض');
+          const soldierImprisoned = soldierExcuses.filter(e => e.type === 'سجن');
 
-        // Count excuses
-        const soldierExcuses = excuses.filter(e => e.soldierId === soldier.id && e.startDate <= toDate && e.endDate >= fromDate);
-        const soldierLeaves = soldierExcuses.filter(e => e.type === 'إجازة');
-        const soldierSickness = soldierExcuses.filter(e => e.type === 'مرض');
-        const soldierImprisoned = soldierExcuses.filter(e => e.type === 'سجن');
+          const soldierViolations = violations.filter(v => v.soldierId === soldier.id && v.date >= fromDate && v.date <= toDate);
+          const soldierViolationsAll = violations.filter(v => v.soldierId === soldier.id);
+          const activeExcuseToday = soldierExcuses.find(e => e.startDate <= today && e.endDate >= today);
 
-        // Count violations
-        const soldierViolations = violations.filter(v => v.soldierId === soldier.id && v.date >= fromDate && v.date <= toDate);
-
-        // Check active excuse today
-        const activeExcuseToday = soldierExcuses.find(e => e.startDate <= today && e.endDate >= today);
-
+          return {
+            ...soldier,
+            militaryId: soldier.militaryId,
+            fullName: soldier.fullName,
+            rank: soldier.rank,
+            unit: soldier.unit,
+            battalion: soldier.battalion,
+            presentCount,
+            absentCount,
+            onLeaveCount,
+            onTaskCount,
+            sickCount,
+            imprisonedCount,
+            totalLeaveRecords: soldierLeaves.length,
+            totalSicknessRecords: soldierSickness.length,
+            totalImprisonmentRecords: soldierImprisoned.length,
+            totalViolations: soldierViolations.length,
+            activeExcuse: activeExcuseToday?.type || '-',
+            // Full counts (all time)
+            attendanceCount: soldierAttendance.length,
+            excusesCount: soldierExcusesAll.length,
+            leaveCount: soldierExcusesAll.filter(e => e.type === 'إجازة').length,
+            violationsCount: soldierViolationsAll.length,
+            // Data arrays for template access
+            _attendance: soldierAttendance,
+            _excuses: soldierExcusesAll,
+            _violations: soldierViolationsAll
+          };
+        });
+    }, [soldiers, attendanceData, excuses, violations, fromDate, toDate, searchTerm, unitFilter, battalionFilter, rankFilter]);
+    
+    // Added new report data - Enriched with related records from all tables
+    const newReportsData = useMemo(() => {
+      if (!soldiers) return [];
+      return soldiers.filter(s => !s.archived && applyGeneralFilters(s)).map(soldier => {
+        const soldierAttendance = attendanceData?.filter(a => a.soldierId === soldier.id) || [];
+        const soldierExcuses = excuses?.filter(e => e.soldierId === soldier.id) || [];
+        const soldierViolations = violations?.filter(v => v.soldierId === soldier.id) || [];
+        
         return {
-          militaryId: soldier.militaryId,
-          fullName: soldier.fullName,
-          rank: soldier.rank,
-          unit: soldier.unit,
-          battalion: soldier.battalion,
-          presentCount,
-          absentCount,
-          onLeaveCount,
-          onTaskCount,
-          sickCount,
-          imprisonedCount,
-          totalLeaveRecords: soldierLeaves.length,
-          totalSicknessRecords: soldierSickness.length,
-          totalImprisonmentRecords: soldierImprisoned.length,
-          totalViolations: soldierViolations.length,
-          activeExcuse: activeExcuseToday?.type || '-',
+          ...soldier,
+          // Attendance aggregates
+          attendanceCount: soldierAttendance.length,
+          presentCount: soldierAttendance.filter(a => a.status === 'حاضر').length,
+          absentCount: soldierAttendance.filter(a => a.status === 'غائب').length,
+          // Excuses aggregates
+          excusesCount: soldierExcuses.length,
+          leaveCount: soldierExcuses.filter(e => e.type === 'إجازة').length,
+          sickCount: soldierExcuses.filter(e => e.type === 'مرض').length,
+          imprisonmentCount: soldierExcuses.filter(e => e.type === 'سجن').length,
+          // Violations aggregates
+          violationsCount: soldierViolations.length,
+          _attendance: soldierAttendance,
+          _excuses: soldierExcuses,
+          _violations: soldierViolations
         };
-      })
-      .filter(r => {
-        if (!searchTerm) return true;
-        const search = searchTerm.toLowerCase();
-        return r.fullName.toLowerCase().includes(search) || r.militaryId.toLowerCase().includes(search);
       });
-  }, [soldiers, attendanceData, excuses, violations, fromDate, toDate, searchTerm]);
+    }, [soldiers, unitFilter, battalionFilter, rankFilter, searchTerm, attendanceData, excuses, violations]);
+    
+    const dailyMovementData = useMemo(() => {
+      if (!soldiers || !attendanceData) return [];
+      const todayStr = toDate; // Using toDate as target date for movement
+      
+      return soldiers.filter(s => !s.archived && applyGeneralFilters(s)).map(soldier => {
+        const todayAtt = attendanceData.find(a => a.soldierId === soldier.id && a.date === todayStr);
+        const soldierAttendance = attendanceData.filter(a => a.soldierId === soldier.id) || [];
+        const soldierExcuses = excuses?.filter(e => e.soldierId === soldier.id) || [];
+        const soldierViolations = violations?.filter(v => v.soldierId === soldier.id) || [];
+        
+        return {
+          ...soldier,
+          status: todayAtt ? todayAtt.status : 'غير مسجل',
+          // Attendance aggregates
+          attendanceCount: soldierAttendance.length,
+          presentCount: soldierAttendance.filter(a => a.status === 'حاضر').length,
+          absentCount: soldierAttendance.filter(a => a.status === 'غائب').length,
+          // Excuses aggregates
+          excusesCount: soldierExcuses.length,
+          leaveCount: soldierExcuses.filter(e => e.type === 'إجازة').length,
+          sickCount: soldierExcuses.filter(e => e.type === 'مرض').length,
+          imprisonmentCount: soldierExcuses.filter(e => e.type === 'سجن').length,
+          // Violations aggregates
+          violationsCount: soldierViolations.length,
+          _attendance: soldierAttendance,
+          _excuses: soldierExcuses,
+          _violations: soldierViolations
+        };
+      });
+    }, [soldiers, attendanceData, toDate, unitFilter, battalionFilter, rankFilter, searchTerm, excuses, violations]);
+    
 
   const getReportData = () => {
-    switch (reportType) {
-      case 'attendance':
-        return attendanceReportData;
-      case 'excuses':
-        return excusesReportData;
-      case 'violations':
-        return violationsReportData;
-      case 'comprehensive':
-        return comprehensiveReportData;
-      default:
-        return [];
-    }
-  };
+      switch (reportType) {
+        case 'attendance': return attendanceReportData;
+        case 'excuses': return excusesReportData;
+        case 'violations': return violationsReportData;
+        case 'comprehensive': return comprehensiveReportData;
+        case 'daily_movement': return dailyMovementData;
+        case 'monthly_leadership_report':
+        case 'quarterly_readiness_report':
+        case 'individual_data':
+        case 'unit_personnel':
+        case 'human_power':
+        case 'personnel_distribution':
+        case 'promotion_eligible':
+        case 'presence_status':
+        case 'general_statistics':
+           return newReportsData;
+        default: return [];
+      }
+    };
 
   const getReportColumns = () => {
-    switch (reportType) {
-      case 'attendance':
-        return selectedAttendanceFields;
-      case 'excuses':
-        return ['militaryId', 'fullName', 'rank', 'unit', 'type', 'startDate', 'endDate', 'permissionNumber', 'approvedBy'];
-      case 'violations':
-        return ['militaryId', 'fullName', 'rank', 'unit', 'date', 'reason', 'punishment', 'notes'];
-      case 'comprehensive':
-        return selectedComprehensiveFields;
-      default:
-        return [];
-    }
-  };
+      switch (reportType) {
+        case 'attendance': return selectedAttendanceFields;
+        case 'excuses': return ['militaryId', 'fullName', 'rank', 'unit', 'type', 'startDate', 'endDate', 'permissionNumber', 'approvedBy'];
+        case 'violations': return ['militaryId', 'fullName', 'rank', 'unit', 'date', 'reason', 'punishment', 'notes'];
+        case 'comprehensive': return selectedComprehensiveFields;
+        case 'individual_data': return ['militaryId', 'fullName', 'rank', 'unit', 'battalion', 'birthDate', 'nationalId', 'specialization', 'joinDate', 'adminStatus', 'healthStatus', 'maritalStatus', 'phoneNumber', 'address'];
+        case 'unit_personnel': return ['militaryId', 'fullName', 'rank', 'unit', 'battalion', 'specialization', 'adminStatus'];
+        case 'human_power': return ['unit', 'battalion', 'rank', 'fullName', 'militaryId', 'specialization'];
+        case 'personnel_distribution': return ['unit', 'battalion', 'specialization', 'fullName', 'rank'];
+        case 'promotion_eligible': return ['militaryId', 'fullName', 'rank', 'unit', 'lastPromotionDate', 'nextPromotionDate'];
+        case 'daily_movement': return ['militaryId', 'fullName', 'rank', 'unit', 'status'];
+        case 'monthly_leadership_report': return ['militaryId', 'fullName', 'rank', 'unit', 'presentCount', 'absentCount', 'onLeaveCount', 'totalViolations'];
+        case 'quarterly_readiness_report': return ['militaryId', 'fullName', 'rank', 'unit', 'adminStatus', 'healthStatus', 'specialization'];
+        case 'presence_status': return ['militaryId', 'fullName', 'rank', 'unit', 'adminStatus', 'healthStatus'];
+        case 'general_statistics': return ['unit', 'battalion', 'rank'];
+        default: return [];
+      }
+    };
 
   const getColumnLabel = (columnId: string): string => {
-    const labels: Record<string, string> = {
-      militaryId: 'الرقم العسكري',
-      fullName: 'الاسم الكامل',
-      rank: 'الرتبة',
-      unit: 'الوحدة',
-      battalion: 'الكتيبة',
-      status: 'الحالة',
-      date: 'التاريخ',
-      phoneNumber: 'رقم الهاتف',
-      specialization: 'التخصص',
-      type: 'النوع',
-      startDate: 'من تاريخ',
-      endDate: 'إلى تاريخ',
-      permissionNumber: 'رقم التصريح',
-      approvedBy: 'جهة الاعتماد',
-      reason: 'السبب',
-      punishment: 'العقوبة',
-      notes: 'ملاحظات',
-      presentCount: 'الحاضر',
-      absentCount: 'الغائب',
-      onLeaveCount: 'إجازة',
-      onTaskCount: 'مهمة',
-      sickCount: 'مريض',
-      imprisonedCount: 'سجن',
-      totalLeaveRecords: 'إجازات',
-      totalSicknessRecords: 'أمراض',
-      totalImprisonmentRecords: 'سجن',
-      totalViolations: 'المخالفات',
-      activeExcuse: 'العذر النشط',
-    };
+      const labels: Record<string, string> = {
+        militaryId: 'الرقم العسكري',
+        fullName: 'الاسم الكامل',
+        rank: 'الرتبة',
+        unit: 'الوحدة',
+        battalion: 'الكتيبة',
+        status: 'الحالة',
+        date: 'التاريخ',
+        phoneNumber: 'رقم الهاتف',
+        specialization: 'التخصص',
+        type: 'النوع',
+        startDate: 'من تاريخ',
+        endDate: 'إلى تاريخ',
+        permissionNumber: 'رقم التصريح',
+        approvedBy: 'جهة الاعتماد',
+        reason: 'السبب',
+        punishment: 'العقوبة',
+        notes: 'ملاحظات',
+        presentCount: 'الحاضر',
+        absentCount: 'الغائب',
+        onLeaveCount: 'إجازة',
+        onTaskCount: 'مهمة',
+        sickCount: 'مريض',
+        imprisonedCount: 'سجن',
+        totalLeaveRecords: 'إجازات',
+        totalSicknessRecords: 'أمراض',
+        totalImprisonmentRecords: 'سجن',
+        totalViolations: 'المخالفات',
+        activeExcuse: 'العذر النشط',
+        birthDate: 'تاريخ الميلاد',
+        nationalId: 'الهوية الوطنية',
+        joinDate: 'تاريخ الالتحاق',
+        adminStatus: 'الحالة الإدارية',
+        healthStatus: 'الحالة الصحية',
+        maritalStatus: 'الحالة الاجتماعية',
+        address: 'العنوان',
+        lastPromotionDate: 'تاريخ آخر ترقية',
+        nextPromotionDate: 'تاريخ الترقية القادمة',
+        // Aggregated fields
+        attendanceCount: 'عدد السجلات الحضور',
+        excusesCount: 'عدد الأعذار',
+        leaveCount: 'عدد الإجازات',
+        imprisonmentCount: 'عدد حالات السجن',
+        violationsCount: 'عدد المخالفات',
+        // Additional soldier fields
+        birthPlace: 'مكان الميلاد',
+        closestRelative: 'أقرب الأقارب',
+        photoPath: 'صورة',
+      };
     return labels[columnId] || columnId;
   };
 
@@ -358,6 +558,10 @@ export default function Reports() {
       const row: any = {};
       columns.forEach(col => {
         row[getColumnLabel(col)] = (record as any)[col];
+      });
+      // Add custom fields to export
+      activeCustomFields.forEach(cf => {
+        row[cf.label] = fieldValueToString((record as any).dynamicFields?.[cf.name], cf.type);
       });
       return row;
     });
@@ -383,41 +587,113 @@ export default function Reports() {
     documentTitle: 'تقرير',
   });
 
+  // Helper function to safely access nested data
+  const getNestedValue = (obj: any, path: string): any => {
+    return path.split('.').reduce((current, prop) => {
+      if (current == null) return '-';
+      return current[prop];
+    }, obj);
+  };
+
+  // Helper function to format value for display
+  const formatValue = (val: any): string => {
+    if (val === null || val === undefined) return '-';
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return val.toString();
+    if (Array.isArray(val)) return val.length.toString(); // Return array length
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  };
+
   const getReportHtml = () => {
     if (!selectedTemplate || !templates) return null;
     const template = templates.find(t => t.id === parseInt(selectedTemplate));
     if (!template) return null;
 
-    let recordsHtml = '';
     const columns = getReportColumns();
     const data = getReportData();
 
-    // Custom table rendering for general templates, or just replacing values for specific records
-    // Assuming template is for a single record or it handles loop itself via custom script - but for simple MVP, we just render a table if it's a list, or the template for each record.
-    // For now, let's render the template for each record sequentially.
-    
     return data.map((record, index) => {
       let html = template.htmlContent;
-      
-      // Basic replacements
       const safeRecord = record as any;
-      html = html.replace(/{{militaryId}}/g, safeRecord.militaryId || '-');
-      html = html.replace(/{{fullName}}/g, safeRecord.fullName || '-');
-      html = html.replace(/{{rank}}/g, safeRecord.rank || '-');
-      html = html.replace(/{{unit}}/g, safeRecord.unit || '-');
-      html = html.replace(/{{battalion}}/g, safeRecord.battalion || '-');
-      html = html.replace(/{{specialization}}/g, safeRecord.specialization || '-');
-      html = html.replace(/{{status}}/g, safeRecord.status || '-');
-      html = html.replace(/{{date}}/g, safeRecord.date || format(new Date(), 'yyyy-MM-dd'));
-      html = html.replace(/{{currentDate}}/g, format(new Date(), 'yyyy-MM-dd'));
-      
-      // Also try to replace any other field dynamically
-      Object.keys(safeRecord).forEach(key => {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        let val = safeRecord[key];
-        if (typeof val === 'number') val = val.toString();
-        if (val === null || val === undefined) val = '-';
-        html = html.replace(regex, val);
+
+      // Find all {{variable}} or {{table.field}} patterns in template
+      const variablePattern = /\{\{([^}]+)\}\}/g;
+      let match;
+      const replacements = new Map<string, string>();
+
+      while ((match = variablePattern.exec(template.htmlContent)) !== null) {
+        const fullVariable = match[1].trim();
+        
+        // Check if it's a special field like currentDate
+        if (fullVariable === 'currentDate') {
+          replacements.set(fullVariable, format(new Date(), 'yyyy-MM-dd'));
+          continue;
+        }
+
+        if (fullVariable === 'fromDate') {
+          replacements.set(fullVariable, fromDate);
+          continue;
+        }
+
+        if (fullVariable === 'toDate') {
+          replacements.set(fullVariable, toDate);
+          continue;
+        }
+
+        // Try direct field access first (soldier fields or calculated aggregates)
+        if (safeRecord.hasOwnProperty(fullVariable)) {
+          replacements.set(fullVariable, formatValue(safeRecord[fullVariable]));
+          continue;
+        }
+
+        // Try nested access for related table data
+        // Support patterns like: attendance.0.status, excuses.0.type, violations.0.reason
+        if (fullVariable.includes('.')) {
+          const val = getNestedValue(safeRecord, fullVariable);
+          replacements.set(fullVariable, formatValue(val));
+          continue;
+        }
+
+        // Try to get from related data arrays with common access patterns
+        // For attendance: attendanceCount, presentCount, etc.
+        if (fullVariable.includes('attendance') || fullVariable.includes('Attendance')) {
+          const val = safeRecord[fullVariable];
+          if (val !== undefined) {
+            replacements.set(fullVariable, formatValue(val));
+          }
+          continue;
+        }
+
+        // For excuses: excusesCount, leaveCount, etc.
+        if (fullVariable.includes('excuse') || fullVariable.includes('Excuse') || 
+            fullVariable.includes('leave') || fullVariable.includes('sick') ||
+            fullVariable.includes('imprisonment') || fullVariable.includes('Imprisonment')) {
+          const val = safeRecord[fullVariable];
+          if (val !== undefined) {
+            replacements.set(fullVariable, formatValue(val));
+          }
+          continue;
+        }
+
+        // For violations: violationsCount, etc.
+        if (fullVariable.includes('violation') || fullVariable.includes('Violation')) {
+          const val = safeRecord[fullVariable];
+          if (val !== undefined) {
+            replacements.set(fullVariable, formatValue(val));
+          }
+          continue;
+        }
+
+        // Default: try to get from record
+        const val = safeRecord[fullVariable];
+        replacements.set(fullVariable, formatValue(val));
+      }
+
+      // Apply all replacements
+      replacements.forEach((value, key) => {
+        const regex = new RegExp(`\\{\\{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}\\}`, 'g');
+        html = html.replace(regex, value);
       });
 
       return (
@@ -573,7 +849,38 @@ export default function Reports() {
               </div>
             )}
 
-            {/* Search */}
+            {/* Advanced Filters */}
+              <div className="space-y-3">
+                <Label className="text-sm font-bold">الوحدة</Label>
+                <Select value={unitFilter} onValueChange={setUnitFilter}>
+                  <SelectTrigger className="bg-card"><SelectValue placeholder="الكل" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {uniqueUnits.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-3">
+                <Label className="text-sm font-bold">الكتيبة</Label>
+                <Select value={battalionFilter} onValueChange={setBattalionFilter}>
+                  <SelectTrigger className="bg-card"><SelectValue placeholder="الكل" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {uniqueBattalions.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-3">
+                <Label className="text-sm font-bold">الرتبة</Label>
+                <Select value={rankFilter} onValueChange={setRankFilter}>
+                  <SelectTrigger className="bg-card"><SelectValue placeholder="الكل" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {uniqueRanks.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Search */}
             <div className="space-y-3">
               <Label className="text-sm font-bold">بحث</Label>
               <Input 
@@ -622,6 +929,18 @@ export default function Reports() {
                           </div>
                         </TableHead>
                       ))}
+                      {activeCustomFields.map(cf => (
+                        <TableHead
+                          key={`cf-${cf.id}`}
+                          className="font-bold text-center text-purple-700 bg-purple-50/60 cursor-pointer hover:bg-purple-100/60 transition-colors"
+                          onClick={() => handleSort(`dynamicFields.${cf.name}`)}
+                        >
+                          <div className="flex items-center justify-center">
+                            {cf.label}
+                            {getSortIcon(`dynamicFields.${cf.name}`)}
+                          </div>
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -642,6 +961,11 @@ export default function Reports() {
                             </TableCell>
                           );
                         })}
+                        {activeCustomFields.map(cf => (
+                          <TableCell key={`cf-${cf.id}`} className="text-center text-sm">
+                            {fieldValueToString((record as any).dynamicFields?.[cf.name], cf.type)}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     ))}
                   </TableBody>

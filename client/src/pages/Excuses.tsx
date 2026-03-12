@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useSoldiers } from "@/hooks/use-soldiers";
 import { useExcuses, useCreateExcuse, useUpdateExcuse, useDeleteExcuse } from "@/hooks/use-excuses";
+import { useCustomFields } from "@/hooks/use-custom-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { FileText, Plus, Edit, Trash2, Calendar as CalendarIcon, Download } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,7 +20,13 @@ import * as XLSX from 'xlsx';
 
 const EXCUSE_TYPES = ["إجازة", "مرض", "مهمة", "غياب", "سجن"];
 
-export default function Excuses() {
+const fieldValueToString = (val: any, type: string) => {
+    if (val === undefined || val === null) return "-";
+    if (type === "boolean") return val ? "نعم" : "لا";
+    return String(val);
+  };
+
+  export default function Excuses() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedExcuse, setSelectedExcuse] = useState<Excuse | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,6 +35,7 @@ export default function Excuses() {
   const { data: soldiers, isLoading: isLoadingSoldiers } = useSoldiers({ archived: "false" });
   const { data: excuses, isLoading: isLoadingExcuses } = useExcuses();
   const deleteMutation = useDeleteExcuse();
+  const { data: customFields } = useCustomFields("excuses");
 
   const handleCreate = () => {
     setSelectedExcuse(undefined);
@@ -170,6 +179,11 @@ export default function Excuses() {
                     <TableHead className="font-bold">من تاريخ</TableHead>
                     <TableHead className="font-bold">إلى تاريخ</TableHead>
                     <TableHead className="font-bold">رقم التصريح</TableHead>
+                    {customFields?.map(cf => (
+                      <TableHead key={cf.id} className="font-bold text-center text-purple-700 bg-purple-50/60">
+                        {cf.label}
+                      </TableHead>
+                    ))}
                     <TableHead className="w-24 text-center font-bold">إجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -205,6 +219,11 @@ export default function Excuses() {
                         <TableCell>
                           {excuse.permissionNumber || '-'}
                         </TableCell>
+                        {customFields?.map(cf => (
+                          <TableCell key={cf.id} className="text-center text-sm">
+                            {fieldValueToString((excuse.dynamicFields as any)?.[cf.name], cf.type)}
+                          </TableCell>
+                        ))}
                         <TableCell>
                           <div className="flex justify-center gap-2">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50" onClick={() => handleEdit(excuse)}>
@@ -247,6 +266,7 @@ export default function Excuses() {
 function ExcuseForm({ excuse, soldiers, onSuccess }: { excuse?: Excuse, soldiers: Soldier[], onSuccess: () => void }) {
   const createMutation = useCreateExcuse();
   const updateMutation = useUpdateExcuse();
+  const { data: customFields } = useCustomFields("excuses");
   
   const form = useForm({
     resolver: zodResolver(insertExcuseSchema),
@@ -256,7 +276,8 @@ function ExcuseForm({ excuse, soldiers, onSuccess }: { excuse?: Excuse, soldiers
       startDate: format(new Date(), 'yyyy-MM-dd'),
       endDate: format(new Date(), 'yyyy-MM-dd'),
       permissionNumber: "",
-      approvedBy: ""
+      approvedBy: "",
+      dynamicFields: {}
     }
   });
 
@@ -381,6 +402,47 @@ function ExcuseForm({ excuse, soldiers, onSuccess }: { excuse?: Excuse, soldiers
             </FormItem>
           )}
         />
+
+        {customFields && customFields.length > 0 && (
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-bold text-sm text-primary">حقول إضافية</h3>
+            <div className="grid grid-cols-1 gap-4">
+              {customFields.map((field) => (
+                <FormField 
+                  key={field.id}
+                  control={form.control} 
+                  name={`dynamicFields.${field.name}` as any}
+                  render={({ field: formField }) => (
+                    <FormItem>
+                      <FormLabel>{field.label} {field.isRequired && <span className="text-red-500">*</span>}</FormLabel>
+                      {field.type === "text" && <FormControl><Input {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                      {field.type === "number" && <FormControl><Input type="number" {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                      {field.type === "date" && <FormControl><Input type="date" {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                      {field.type === "select" && (
+                        <Select onValueChange={formField.onChange} defaultValue={formField.value || field.defaultValue}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {Array.isArray(field.options) && field.options.map((opt: string) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {field.type === "boolean" && (
+                        <FormControl>
+                          <div className="flex items-center space-x-2">
+                            <Switch checked={!!formField.value} onCheckedChange={formField.onChange} />
+                          </div>
+                        </FormControl>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )} 
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="pt-4 flex justify-end gap-3 border-t">
           <Button type="button" variant="outline" onClick={onSuccess}>إلغاء</Button>

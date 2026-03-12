@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useSoldiers } from "@/hooks/use-soldiers";
 import { useViolations, useCreateViolation, useUpdateViolation, useDeleteViolation } from "@/hooks/use-violations";
+import { useCustomFields } from "@/hooks/use-custom-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,9 +15,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertViolationSchema, type Violation, type Soldier } from "@shared/schema";
 import { format } from "date-fns";
+import { Switch } from "@/components/ui/switch";
 import * as XLSX from 'xlsx';
 
-export default function Violations() {
+const fieldValueToString = (val: any, type: string) => {
+    if (val === undefined || val === null) return "-";
+    if (type === "boolean") return val ? "نعم" : "لا";
+    return String(val);
+  };
+
+  export default function Violations() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedViolation, setSelectedViolation] = useState<Violation | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,6 +32,7 @@ export default function Violations() {
   const { data: soldiers, isLoading: isLoadingSoldiers } = useSoldiers({ archived: "false" });
   const { data: violations, isLoading: isLoadingViolations } = useViolations();
   const deleteMutation = useDeleteViolation();
+  const { data: customFields } = useCustomFields("violations");
 
   const handleCreate = () => {
     setSelectedViolation(undefined);
@@ -136,6 +145,11 @@ export default function Violations() {
                     <TableHead className="font-bold">تاريخ المخالفة</TableHead>
                     <TableHead className="font-bold">السبب</TableHead>
                     <TableHead className="font-bold">العقوبة الموقعة</TableHead>
+                    {customFields?.map(cf => (
+                      <TableHead key={cf.id} className="font-bold text-center text-purple-700 bg-purple-50/60">
+                        {cf.label}
+                      </TableHead>
+                    ))}
                     <TableHead className="w-24 text-center font-bold">إجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -157,6 +171,11 @@ export default function Violations() {
                           {violation.punishment}
                         </span>
                       </TableCell>
+                      {customFields?.map(cf => (
+                        <TableCell key={cf.id} className="text-center text-sm">
+                          {fieldValueToString((violation.dynamicFields as any)?.[cf.name], cf.type)}
+                        </TableCell>
+                      ))}
                       <TableCell>
                         <div className="flex justify-center gap-2">
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50" onClick={() => handleEdit(violation)}>
@@ -198,6 +217,7 @@ export default function Violations() {
 function ViolationForm({ violation, soldiers, onSuccess }: { violation?: Violation, soldiers: Soldier[], onSuccess: () => void }) {
   const createMutation = useCreateViolation();
   const updateMutation = useUpdateViolation();
+  const { data: customFields } = useCustomFields("violations");
   
   const form = useForm({
     resolver: zodResolver(insertViolationSchema),
@@ -206,7 +226,8 @@ function ViolationForm({ violation, soldiers, onSuccess }: { violation?: Violati
       date: format(new Date(), 'yyyy-MM-dd'),
       reason: "",
       punishment: "",
-      notes: ""
+      notes: "",
+      dynamicFields: {}
     }
   });
 
@@ -306,6 +327,47 @@ function ViolationForm({ violation, soldiers, onSuccess }: { violation?: Violati
             </FormItem>
           )}
         />
+
+        {customFields && customFields.length > 0 && (
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-bold text-sm text-primary">حقول إضافية</h3>
+            <div className="grid grid-cols-1 gap-4">
+              {customFields.map((field) => (
+                <FormField 
+                  key={field.id}
+                  control={form.control} 
+                  name={`dynamicFields.${field.name}` as any}
+                  render={({ field: formField }) => (
+                    <FormItem>
+                      <FormLabel>{field.label} {field.isRequired && <span className="text-red-500">*</span>}</FormLabel>
+                      {field.type === "text" && <FormControl><Input {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                      {field.type === "number" && <FormControl><Input type="number" {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                      {field.type === "date" && <FormControl><Input type="date" {...formField} value={formField.value || field.defaultValue || ""} /></FormControl>}
+                      {field.type === "select" && (
+                        <Select onValueChange={formField.onChange} defaultValue={formField.value || field.defaultValue}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {Array.isArray(field.options) && field.options.map((opt: string) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {field.type === "boolean" && (
+                        <FormControl>
+                          <div className="flex items-center space-x-2">
+                            <Switch checked={!!formField.value} onCheckedChange={formField.onChange} />
+                          </div>
+                        </FormControl>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )} 
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="pt-4 flex justify-end gap-3 border-t">
           <Button type="button" variant="outline" onClick={onSuccess}>إلغاء</Button>

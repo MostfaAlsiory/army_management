@@ -1,53 +1,12 @@
 [
   [
-    "backup_manual_full_09-03-2026-_01-19-30.dump",
+    "backup_manual_inc_10-03-2026-_01-32-34.dump",
     {
-      "filename": "backup_manual_full_09-03-2026-_01-19-30.dump",
-      "createdAt": "2026-03-08T22:19:30.287Z",
-      "type": "full",
-      "size": 16614,
-      "description": "يدوية - كاملة"
-    }
-  ],
-  [
-    "backup_manual_full_09-03-2026-_01-24-07.dump",
-    {
-      "filename": "backup_manual_full_09-03-2026-_01-24-07.dump",
-      "createdAt": "2026-03-08T22:24:07.551Z",
-      "type": "full",
-      "size": 17124,
-      "description": "يدوية - كاملة"
-    }
-  ],
-  [
-    "backup_manual_inc_09-03-2026-_01-24-23.dump",
-    {
-      "filename": "backup_manual_inc_09-03-2026-_01-24-23.dump",
-      "createdAt": "2026-03-08T22:24:23.570Z",
+      "filename": "backup_manual_inc_10-03-2026-_01-32-34.dump",
+      "createdAt": "2026-03-09T22:32:34.101Z",
       "type": "incremental",
-      "size": 17148,
-      "description": "يدوية - جزئية",
-      "baseBackup": "backup_manual_full_09-03-2026-_01-24-07.dump"
-    }
-  ],
-  [
-    "backup_auto_full_09-03-2026-_03-29-12.dump",
-    {
-      "filename": "backup_auto_full_09-03-2026-_03-29-12.dump",
-      "createdAt": "2026-03-09T00:29:12.792Z",
-      "type": "full",
-      "size": 23259,
-      "description": "تلقائية - كاملة"
-    }
-  ],
-  [
-    "backup_auto_full_09-03-2026-_04-29-12.dump",
-    {
-      "filename": "backup_auto_full_09-03-2026-_04-29-12.dump",
-      "createdAt": "2026-03-09T01:29:12.800Z",
-      "type": "full",
-      "size": 24343,
-      "description": "تلقائية - كاملة"
+      "size": 23797,
+      "description": "يدوية - جزئية"
     }
   ]
 ]

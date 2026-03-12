@@ -758,6 +758,51 @@ export async function registerRoutes(
   // Trigger automatic notifications on startup
   storage.generateAutomaticNotifications().catch(console.error);
 
+  
+    // Custom Fields Routes
+    app.get("/api/custom-fields", async (req, res) => {
+      const { entityType } = req.query;
+      try {
+        const fields = await storage.getCustomFields(entityType as string | undefined);
+        res.json(fields);
+      } catch (error) {
+        console.error("GET /api/custom-fields error:", error);
+        res.status(500).json({ message: "Failed to fetch custom fields", error: (error as any).message });
+      }
+    });
+
+    app.post("/api/custom-fields", async (req, res) => {
+      try {
+        const field = await storage.createCustomField(req.body);
+        res.status(201).json(field);
+      } catch (error) {
+        console.error("POST /api/custom-fields error:", error);
+        res.status(500).json({ message: "Failed to create custom field", error: (error as any).message });
+      }
+    });
+
+    app.patch("/api/custom-fields/:id", async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const field = await storage.updateCustomField(id, req.body);
+        res.json(field);
+      } catch (error) {
+        console.error("PATCH /api/custom-fields error:", error);
+        res.status(500).json({ message: "Failed to update custom field", error: (error as any).message });
+      }
+    });
+
+    app.delete("/api/custom-fields/:id", async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        await storage.deleteCustomField(id);
+        res.status(204).send();
+      } catch (error) {
+        console.error("DELETE /api/custom-fields error:", error);
+        res.status(500).json({ message: "Failed to delete custom field", error: (error as any).message });
+      }
+    });
+  
   return httpServer;
 }
 
@@ -967,6 +1012,384 @@ async function seedDatabase() {
 }`,
         isSystem: true
       });
+
+        await storage.createReportTemplate({
+          name: "تقرير بيانات الفرد",
+          description: "قالب مخصص لبيانات الفرد الأساسية والتفصيلية",
+          htmlContent: `<div class="report-container">
+    <div class="header">
+      <div class="header-right"><h3>وزارة الدفاع</h3></div>
+      <div class="header-center"><h2>تقرير بيانات الفرد</h2></div>
+      <div class="header-left"><p>التاريخ: {{currentDate}}</p></div>
+    </div>
+    <div class="content">
+      <table class="info-table">
+        <tr><th>الرقم العسكري</th><td>{{militaryId}}</td><th>الاسم الكامل</th><td>{{fullName}}</td></tr>
+        <tr><th>الرتبة</th><td>{{rank}}</td><th>التخصص</th><td>{{specialization}}</td></tr>
+        <tr><th>الوحدة</th><td>{{unit}}</td><th>الكتيبة</th><td>{{battalion}}</td></tr>
+        <tr><th>رقم الهوية</th><td>{{nationalId}}</td><th>تاريخ الميلاد</th><td>{{birthDate}}</td></tr>
+        <tr><th>الحالة الإدارية</th><td>{{adminStatus}}</td><th>الحالة الصحية</th><td>{{healthStatus}}</td></tr>
+        <tr><th>رقم الجوال</th><td>{{phoneNumber}}</td><th>العنوان</th><td>{{address}}</td></tr>
+      </table>
+    </div>
+  </div>`,
+          cssContent: `.report-container { font-family: 'Tajawal', sans-serif; padding: 20px; direction: rtl; } .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; margin-bottom: 20px; } .info-table { width: 100%; border-collapse: collapse; } .info-table th, .info-table td { border: 1px solid #000; padding: 8px; } .info-table th { background-color: #f0f0f0; }`,
+          isSystem: true
+        });
+
+        await storage.createReportTemplate({
+          name: "كشف أفراد الوحدة",
+          description: "قالب لكشف قائمة الأفراد",
+          htmlContent: `<div class="report-container">
+    <div class="header">
+      <div class="header-center"><h2>كشف أفراد الوحدة ({{unit}})</h2></div>
+    </div>
+    <div class="content">
+      <div class="row-item">
+        <span><strong>الرقم:</strong> {{militaryId}}</span>
+        <span><strong>الرتبة:</strong> {{rank}}</span>
+        <span><strong>الاسم:</strong> {{fullName}}</span>
+        <span><strong>الكتيبة:</strong> {{battalion}}</span>
+        <span><strong>التخصص:</strong> {{specialization}}</span>
+        <span><strong>الحالة:</strong> {{adminStatus}}</span>
+      </div>
+    </div>
+  </div>`,
+          cssContent: `.report-container { font-family: 'Tajawal', sans-serif; padding: 20px; direction: rtl; border-bottom: 1px dashed #ccc; } .header { text-align: center; margin-bottom: 10px; } .row-item { display: flex; justify-content: space-between; padding: 5px; } .row-item span { width: 16%; }`,
+          isSystem: true
+        });
+
+        await storage.createReportTemplate({
+          name: "تقرير الإجازات والأعذار",
+          description: "قالب لطباعة إجازة أو عذر لفرد",
+          htmlContent: `<div class="report-container">
+    <div class="header">
+      <div class="header-center"><h2>تصريح {{type}}</h2></div>
+    </div>
+    <div class="content">
+      <table class="info-table">
+        <tr><th>الرقم العسكري</th><td>{{militaryId}}</td><th>الاسم الكامل</th><td>{{fullName}}</td></tr>
+        <tr><th>الرتبة</th><td>{{rank}}</td><th>الوحدة</th><td>{{unit}}</td></tr>
+        <tr><th>تاريخ البداية</th><td>{{startDate}}</td><th>تاريخ النهاية</th><td>{{endDate}}</td></tr>
+        <tr><th>رقم التصريح</th><td>{{permissionNumber}}</td><th>جهة الاعتماد</th><td>{{approvedBy}}</td></tr>
+      </table>
+      <p class="notes">ملاحظات: {{notes}}</p>
+    </div>
+  </div>`,
+          cssContent: `.report-container { font-family: 'Tajawal', sans-serif; padding: 20px; direction: rtl; } .header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 20px; } .info-table { width: 100%; border-collapse: collapse; } .info-table th, .info-table td { border: 1px solid #000; padding: 8px; } .info-table th { background-color: #f0f0f0; } .notes { margin-top: 20px; font-weight: bold; }`,
+          isSystem: true
+        });
+
+        await storage.createReportTemplate({
+          name: "تقرير المخالفات",
+          description: "قالب لطباعة سجل مخالفة",
+          htmlContent: `<div class="report-container">
+    <div class="header">
+      <div class="header-center"><h2>تقرير مخالفة وجزاء</h2></div>
+    </div>
+    <div class="content">
+      <table class="info-table">
+        <tr><th>الرقم العسكري</th><td>{{militaryId}}</td><th>الاسم الكامل</th><td>{{fullName}}</td></tr>
+        <tr><th>الرتبة</th><td>{{rank}}</td><th>الوحدة</th><td>{{unit}}</td></tr>
+        <tr><th>تاريخ المخالفة</th><td>{{date}}</td><th>العقوبة</th><td>{{punishment}}</td></tr>
+      </table>
+      <div class="reason-box">
+        <h4>السبب:</h4>
+        <p>{{reason}}</p>
+      </div>
+    </div>
+  </div>`,
+          cssContent: `.report-container { font-family: 'Tajawal', sans-serif; padding: 20px; direction: rtl; } .header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 20px; } .info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px;} .info-table th, .info-table td { border: 1px solid #000; padding: 8px; } .info-table th { background-color: #f0f0f0; } .reason-box { border: 1px solid #000; padding: 10px; min-height: 80px; }`,
+          isSystem: true
+        });
+  
+    }
+
+    const aggregatedHtml = `
+<div class="aggregated-report">
+  <div class="report-header">
+    <h1>التقرير الإحصائي الشامل</h1>
+    <p class="subtitle">إحصائيات {{groupName}}</p>
+    <p class="period">من {{fromDate}} إلى {{toDate}}</p>
+  </div>
+
+  <div class="summary-cards">
+    <div class="summary-card">
+      <span class="card-label">إجمالي الأفراد</span>
+      <span class="card-value">{{totalSoldiers}}</span>
+    </div>
+    <div class="summary-card">
+      <span class="card-label">الحاضرون</span>
+      <span class="card-value green">{{totalPresent}}</span>
+    </div>
+    <div class="summary-card">
+      <span class="card-label">الغائبون</span>
+      <span class="card-value red">{{totalAbsent}}</span>
+    </div>
+    <div class="summary-card">
+      <span class="card-label">نسبة الحضور</span>
+      <span class="card-value blue">{{attendanceRate}}</span>
+    </div>
+  </div>
+
+  <div class="details-section">
+    <table class="details-table">
+      <thead>
+        <tr>
+          <th>البند</th>
+          <th>العدد</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>إجازات</td>
+          <td>{{totalOnLeave}}</td>
+        </tr>
+        <tr>
+          <td>مهمات</td>
+          <td>{{totalOnTask}}</td>
+        </tr>
+        <tr>
+          <td>مرضى</td>
+          <td>{{totalSick}}</td>
+        </tr>
+        <tr>
+          <td>مسجونون</td>
+          <td>{{totalImprisoned}}</td>
+        </tr>
+        <tr>
+          <td>مخالفات</td>
+          <td class="highlight">{{totalViolations}}</td>
+        </tr>
+        <tr>
+          <td>أعذار</td>
+          <td>{{totalExcuses}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer-info">
+    <p>تاريخ الطباعة: {{currentDate}}</p>
+  </div>
+</div>
+`;
+
+    const aggregatedCss = `
+.aggregated-report { font-family: 'Tajawal', sans-serif; direction: rtl; padding: 40px; color: #000; }
+.report-header { text-align: center; margin-bottom: 40px; border-bottom: 3px solid #1a365d; padding-bottom: 20px; }
+.report-header h1 { font-size: 28px; margin: 0 0 10px 0; color: #1a365d; }
+.subtitle { font-size: 18px; color: #555; margin: 0; }
+.period { font-size: 14px; color: #888; margin: 5px 0 0 0; }
+.summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
+.summary-card { border: 2px solid #ddd; padding: 20px; text-align: center; border-radius: 8px; background: #f9f9f9; }
+.card-label { display: block; font-size: 14px; color: #666; margin-bottom: 10px; }
+.card-value { display: block; font-size: 32px; font-weight: bold; color: #1a365d; }
+.card-value.green { color: #22c55e; }
+.card-value.red { color: #ef4444; }
+.card-value.blue { color: #3b82f6; }
+.details-section { margin-bottom: 40px; }
+.details-table { width: 100%; border-collapse: collapse; }
+.details-table th, .details-table td { border: 1px solid #ddd; padding: 12px; text-align: right; }
+.details-table th { background: #1a365d; color: white; font-weight: bold; }
+.details-table td:nth-child(2) { font-weight: bold; }
+.highlight { color: #ef4444; font-weight: bold; }
+.footer-info { text-align: left; font-size: 12px; color: #888; margin-top: 40px; }
+`;
+
+    try {
+      const existingTemplates2 = await storage.getReportTemplates();
+      if (!existingTemplates2.find(t => t.name === "التقرير الإحصائي الشامل")) {
+        await storage.createReportTemplate({
+          name: "التقرير الإحصائي الشامل",
+          description: "تقرير إحصائي شامل للوحدات والكتائب",
+          htmlContent: aggregatedHtml,
+          cssContent: aggregatedCss,
+          isSystem: true
+        });
+      }
+    } catch (e) {
+      console.error("Error seeding aggregated template:", e);
+    }
+
+    try {
+      const monthlyHtml = `
+<div class="leadership-report">
+  <div class="header">
+    <div class="top-info">
+      <p>الجمهورية اليمنية</p>
+      <p>وزارة الدفاع</p>
+      <p>رئاسة هيئة الأركان العامة</p>
+    </div>
+    <div class="main-title">
+      <h1>التقرير الشهري للقوة البشرية</h1>
+      <p>عن الفترة من: {{fromDate}} إلى: {{toDate}}</p>
+    </div>
+  </div>
+
+  <div class="soldier-info">
+    <table class="data-table">
+      <tr>
+        <th colspan="4" class="section-head">البيانات الأساسية للفرد</th>
+      </tr>
+      <tr>
+        <td class="label">الاسم الكامل:</td>
+        <td class="value">{{fullName}}</td>
+        <td class="label">الرقم العسكري:</td>
+        <td class="value">{{militaryId}}</td>
+      </tr>
+      <tr>
+        <td class="label">الرتبة:</td>
+        <td class="value">{{rank}}</td>
+        <td class="label">الوحدة/الكتيبة:</td>
+        <td class="value">{{unit}} / {{battalion}}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-box">
+      <span class="stat-label">أيام الحضور</span>
+      <span class="stat-value">{{presentCount}}</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">أيام الغياب</span>
+      <span class="stat-value">{{absentCount}}</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">الإجازات</span>
+      <span class="stat-value">{{onLeaveCount}}</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">المخالفات</span>
+      <span class="stat-value">{{totalViolations}}</span>
+    </div>
+  </div>
+
+  <div class="report-content">
+    <h3>خلاصة الحالة الانضباطية:</h3>
+    <p>بناءً على السجلات الرسمية للفترة المحددة، فإن الفرد المذكور أعلاه قد أتم فترة الخدمة بانضباط عسكري بنسبة {{presentCount}} يوماً حضوراً فعلياً. 
+    وتم رصد عدد ({{totalViolations}}) مخالفات انضباطية خلال هذه الفترة.</p>
+  </div>
+
+  <div class="footer-signatures">
+    <div class="signature">
+      <p>ضابط القوة البشرية</p>
+      <div class="sig-line"></div>
+    </div>
+    <div class="signature">
+      <p>قائد الوحدة</p>
+      <div class="sig-line"></div>
+    </div>
+  </div>
+  
+  <div class="print-date">تاريخ الطباعة: {{currentDate}}</div>
+</div>
+`;
+      const monthlyCss = `
+.leadership-report { font-family: 'Tajawal', sans-serif; direction: rtl; padding: 40px; color: #000; position: relative; }
+.header { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; border-bottom: 3px double #000; padding-bottom: 20px; }
+.top-info { position: absolute; top: 0; right: 0; font-weight: bold; font-size: 14px; text-align: right; }
+.main-title { text-align: center; margin-top: 40px; }
+.main-title h1 { font-size: 24px; margin-bottom: 5px; }
+.data-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+.data-table td, .data-table th { border: 1px solid #000; padding: 10px; text-align: right; }
+.section-head { background-color: #f0f0f0; font-weight: bold; text-align: center !important; }
+.label { width: 20%; font-weight: bold; background-color: #f9f9f9; }
+.value { width: 30%; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
+.stat-box { border: 2px solid #000; padding: 15px; text-align: center; }
+.stat-label { display: block; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+.stat-value { font-size: 24px; font-weight: bold; }
+.report-content { margin-bottom: 60px; line-height: 1.8; }
+.footer-signatures { display: flex; justify-content: space-between; margin-bottom: 40px; }
+.signature { width: 200px; text-align: center; }
+.sig-line { margin-top: 40px; border-top: 1px solid #000; }
+.print-date { font-size: 10px; text-align: left; margin-top: 20px; }
+`;
+      const readinessHtml = `
+<div class="readiness-report">
+  <div class="army-header">
+    <div class="title-block">
+      <h1>تقرير الجاهزية القتالية والروح المعنوية</h1>
+      <h2>التقرير الربع سنوي للعام {{currentDate}}</h2>
+    </div>
+  </div>
+
+  <div class="summary-section">
+    <p>بيانات الفرد: {{rank}} / {{fullName}} ({{militaryId}})</p>
+    <p>الوحدة: {{unit}} - التخصص: {{specialization}}</p>
+  </div>
+
+  <table class="readiness-table">
+    <thead>
+      <tr>
+        <th>المعيار</th>
+        <th>التقييم المستنتج</th>
+        <th>ملاحظات</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>الانضباط العسكري</td>
+        <td>{{presentCount}} / {{attendanceCount}}</td>
+        <td>{{totalViolations}} مخالفات مسجلة</td>
+      </tr>
+      <tr>
+        <td>الحالة الصحية</td>
+        <td>{{healthStatus}}</td>
+        <td>تاريخ الانضمام: {{joinDate}}</td>
+      </tr>
+      <tr>
+        <td>الحالة الإدارية</td>
+        <td>{{adminStatus}}</td>
+        <td>{{activeExcuse}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="eval-block">
+    <h3>التوصية العامة للقائد:</h3>
+    <div class="eval-box">
+      بناءً على إجمالي أيام الغياب ({{absentCount}}) وأيام الإجازات ({{onLeaveCount}})، يتم تقييم مستوى الجاهزية.
+    </div>
+  </div>
+</div>
+`;
+      const readinessCss = `
+.readiness-report { font-family: 'Tajawal', sans-serif; direction: rtl; padding: 30px; border: 5px solid #1a365d; min-height: 1000px; }
+.army-header { display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #1a365d; padding-bottom: 20px; margin-bottom: 30px; }
+.title-block { text-align: center; }
+.title-block h1 { color: #1a365d; font-size: 22px; margin: 0; }
+.summary-section { background: #f8fafc; padding: 15px; border-right: 5px solid #1a365d; margin-bottom: 30px; }
+.readiness-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+.readiness-table th, .readiness-table td { border: 1px solid #cbd5e1; padding: 15px; text-align: center; }
+.readiness-table th { background: #1a365d; color: white; }
+.eval-block { margin-top: 50px; }
+.eval-box { border: 1px dashed #000; padding: 20px; margin-top: 10px; height: 100px; }
+`;
+
+      const existingTemplates = await storage.getReportTemplates();
+      if (!existingTemplates.find(t => t.name === "التقرير الشهري المرفوع للقيادة")) {
+        await storage.createReportTemplate({
+          name: "التقرير الشهري المرفوع للقيادة",
+          description: "تقرير رسمي مفصل يحتوي على إحصائيات الحضور والانضباط الشهري",
+          htmlContent: monthlyHtml,
+          cssContent: monthlyCss,
+          isSystem: true
+        });
+      }
+      if (!existingTemplates.find(t => t.name === "تقرير الجاهزية الربع سنوي")) {
+        await storage.createReportTemplate({
+          name: "تقرير الجاهزية الربع سنوي",
+          description: "تقرير تقييمي للجاهزية القتالية والحالة الإدارية للأفراد",
+          htmlContent: readinessHtml,
+          cssContent: readinessCss,
+          isSystem: true
+        });
+      }
+    } catch (err) {
+      console.error("Failed to seed professional templates:", err);
     }
   } catch (err) {
     console.error("Failed to seed db:", err);

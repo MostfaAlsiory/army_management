@@ -1,4 +1,5 @@
 {
   "autoBackupEnabled": true,
-  "intervalHours": 1
+  "intervalHours": 24,
+  "autoBackupType": "full"
 }

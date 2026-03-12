@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { useSoldiers } from "@/hooks/use-soldiers";
 import { useAttendance, useBulkAttendance } from "@/hooks/use-attendance";
 import { useExcuses } from "@/hooks/use-excuses";
+import { useCustomFields } from "@/hooks/use-custom-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,13 @@ type SortConfig = {
   direction: 'asc' | 'desc' | null;
 };
 
-export default function Attendance() {
+const fieldValueToString = (val: any, type: string) => {
+    if (val === undefined || val === null) return "-";
+    if (type === "boolean") return val ? "نعم" : "لا";
+    return String(val);
+  };
+
+  export default function Attendance() {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [attendanceState, setAttendanceState] = useState<Record<number, string>>({});
   const [manualChanges, setManualChanges] = useState<Set<number>>(new Set());
@@ -33,6 +40,9 @@ export default function Attendance() {
 
   // Fetch active excuses for the selected date
   const { data: activeExcuses, isLoading: isLoadingExcuses } = useExcuses(undefined, selectedDate);
+  
+  // Fetch custom fields for attendance
+  const { data: customFields } = useCustomFields("attendance");
   
   const bulkSaveMutation = useBulkAttendance();
 

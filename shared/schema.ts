@@ -1,4 +1,4 @@
-import { pgTable, text, serial, date, boolean, integer, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, date, boolean, integer, timestamp, varchar, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -30,6 +30,7 @@ export const soldiers = pgTable("soldiers", {
   nextPromotionDate: date("next_promotion_date"),
   
   archived: boolean("archived").default(false).notNull(),
+  dynamicFields: jsonb("dynamic_fields").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -55,6 +56,7 @@ export const attendance = pgTable("attendance", {
   soldierId: integer("soldier_id").references(() => soldiers.id).notNull(),
   date: date("date").notNull(),
   status: varchar("status").notNull(), 
+  dynamicFields: jsonb("dynamic_fields").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -72,6 +74,7 @@ export const violations = pgTable("violations", {
   reason: text("reason").notNull(),
   punishment: varchar("punishment").notNull(), // e.g., سجن، خصم الخ
   notes: text("notes"),
+  dynamicFields: jsonb("dynamic_fields").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -91,6 +94,7 @@ export const excuses = pgTable("excuses", {
   permissionNumber: varchar("permission_number"),
   approvedBy: varchar("approved_by"),
   notes: text("notes"),
+  dynamicFields: jsonb("dynamic_fields").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -176,3 +180,21 @@ export interface AttendanceReport {
   unit: string;
   absences: number;
 }
+
+
+  export const customFields = pgTable("custom_fields", {
+    id: serial("id").primaryKey(),
+    entityType: varchar("entity_type").notNull(), // 'soldiers', 'attendance', 'violations', 'excuses'
+    name: varchar("name").notNull(), // internal key like 'custom_blood_type'
+    label: varchar("label").notNull(), // display name
+    type: varchar("type").notNull(), // 'text', 'number', 'date', 'select', 'boolean'
+    options: jsonb("options"), // array of strings for 'select'
+    isRequired: boolean("is_required").default(false).notNull(),
+    defaultValue: text("default_value"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  });
+
+  export const insertCustomFieldSchema = createInsertSchema(customFields).omit({ id: true, createdAt: true });
+  export type CustomField = typeof customFields.$inferSelect;
+  export type InsertCustomField = z.infer<typeof insertCustomFieldSchema>;
+  

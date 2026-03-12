@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { 
   Users, 
   LayoutDashboard, 
+  Settings, 
   CalendarCheck, 
   FileBarChart,
   Shield,
@@ -11,7 +12,8 @@ import {
   AlertOctagon,
   FileText,
   History,
-  DatabaseBackup
+  DatabaseBackup,
+  BarChart3
 } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
@@ -37,8 +39,10 @@ const menuItems = [
   { title: "المخالفات والجزاءات", url: "/violations", icon: AlertOctagon },
   { title: "الأعذار والإجازات", url: "/excuses", icon: FileText },
   { title: "التقارير", url: "/reports", icon: FileBarChart },
+  { title: "التقارير الإحصائية", url: "/aggregated-reports", icon: BarChart3 },
   { title: "قوالب التقارير", url: "/report-templates", icon: FileText },
   { title: "النسخ الاحتياطي", url: "/backups", icon: DatabaseBackup },
+  { title: "إعدادات الحقول", url: "/custom-fields", icon: Settings },
   { title: "سجل النظام", url: "/activity-logs", icon: History },
 ];
 
